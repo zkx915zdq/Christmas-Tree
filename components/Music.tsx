@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 
 interface MusicProps {
@@ -22,9 +23,8 @@ export const Music: React.FC<MusicProps> = ({ enabled, src }) => {
     audio.volume = 0.4;
     audioRef.current = audio;
 
-    if (enabled) {
-      audio.play().catch(e => console.warn("Audio autoplay blocked:", e));
-    }
+    // Do NOT auto-play here based on 'enabled' prop immediately
+    // Wait for the specific effect below to handle start/restart logic
 
     return () => {
       audio.pause();
@@ -32,13 +32,17 @@ export const Music: React.FC<MusicProps> = ({ enabled, src }) => {
     };
   }, [src]);
 
+  // Handle Play/Pause and Restart
   useEffect(() => {
-    if (audioRef.current) {
-      if (enabled) {
-        audioRef.current.play().catch(e => console.warn("Audio autoplay blocked:", e));
-      } else {
-        audioRef.current.pause();
-      }
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (enabled) {
+      // RESTART Logic: Reset time to 0 when enabled becomes true
+      audio.currentTime = 0;
+      audio.play().catch(e => console.warn("Audio autoplay blocked:", e));
+    } else {
+      audio.pause();
     }
   }, [enabled]);
 

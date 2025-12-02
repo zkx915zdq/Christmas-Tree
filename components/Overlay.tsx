@@ -1,16 +1,60 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { OverlayProps } from '../types';
 
 export const Overlay: React.FC<OverlayProps> = ({ config, setConfig }) => {
   const [isVisible, setIsVisible] = useState(true);
   
+  // Countdown State
+  const [countdownSetting, setCountdownSetting] = useState(0); // 0, 3, 5, 10
+  const [isCountingDown, setIsCountingDown] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(0);
+
   const toggleLights = () => setConfig(prev => ({ ...prev, lightsOn: !prev.lightsOn }));
   const toggleSnow = () => setConfig(prev => ({ ...prev, snowEnabled: !prev.snowEnabled }));
   const toggleMusic = () => setConfig(prev => ({ ...prev, musicEnabled: !prev.musicEnabled }));
   const toggleRotation = () => setConfig(prev => ({ ...prev, rotationSpeed: prev.rotationSpeed > 0 ? 0 : 0.2 }));
   
-  const animateRibbon = () => setConfig(prev => ({ ...prev, ribbonAnimationTrigger: prev.ribbonAnimationTrigger + 1 }));
+  const startExperience = () => {
+      setConfig(prev => ({ 
+          ...prev, 
+          isExperienceActive: true, 
+          ribbonAnimationTrigger: prev.ribbonAnimationTrigger + 1 
+      }));
+  };
+
+  const handleStartClick = () => {
+      if (config.isExperienceActive) {
+          // If active, just close it immediately
+          setConfig(prev => ({ ...prev, isExperienceActive: false }));
+          setIsVisible(true); // Show menu when closing
+      } else {
+          // If starting...
+          setIsVisible(false); // Hide menu immediately
+          if (countdownSetting > 0) {
+              setTimeLeft(countdownSetting);
+              setIsCountingDown(true);
+          } else {
+              startExperience();
+          }
+      }
+  };
+
+  // Countdown Logic (Internal only, no display)
+  useEffect(() => {
+      let timer: any;
+      if (isCountingDown && timeLeft > 0) {
+          timer = setTimeout(() => {
+              setTimeLeft(prev => prev - 1);
+          }, 1000);
+      } else if (isCountingDown && timeLeft === 0) {
+          // Countdown finished
+          setIsCountingDown(false);
+          startExperience();
+      }
+      return () => clearTimeout(timer);
+  }, [isCountingDown, timeLeft]);
+
 
   const handleBgmUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -28,19 +72,35 @@ export const Overlay: React.FC<OverlayProps> = ({ config, setConfig }) => {
     }
   };
 
-  const handleColorChange = (key: 'treeColor' | 'ribbonColor' | 'starColor' | 'skyColor', e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleColorChange = (key: 'treeColor' | 'ribbonColor' | 'starColor' | 'skyColor' | 'headerColor', e: React.ChangeEvent<HTMLInputElement>) => {
     setConfig(prev => ({ ...prev, [key]: e.target.value }));
   };
 
+  const fonts = [
+    { name: 'Mountains of Christmas', value: '"Mountains of Christmas", serif' },
+    { name: 'Great Vibes', value: '"Great Vibes", cursive' },
+    { name: 'Cinzel', value: '"Cinzel", serif' },
+    { name: 'Henny Penny', value: '"Henny Penny", cursive' },
+    { name: 'Playfair Display', value: '"Playfair Display", serif' },
+  ];
+
   return (
     <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-10 overflow-hidden">
-      {/* Header */}
-      <header className={`absolute top-8 w-full text-center transition-opacity duration-500 ${isVisible ? 'opacity-90' : 'opacity-0'}`}>
-        <h1 className="text-4xl md:text-6xl font-serif text-[#d4af37] tracking-wider drop-shadow-[0_2px_10px_rgba(212,175,55,0.5)] font-bold" style={{ fontFamily: '"Mountains of Christmas", serif' }}>
-          KaiXuan's Christmas Tree
-        </h1>
+      {/* Header - Always Visible */}
+      <header className="absolute top-8 w-full text-center pointer-events-auto z-40 transition-opacity duration-500 opacity-100">
+        <input 
+            type="text"
+            value={config.headerText}
+            onChange={(e) => setConfig(prev => ({ ...prev, headerText: e.target.value }))}
+            className="text-4xl md:text-6xl text-center bg-transparent border-none outline-none w-full font-bold drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)] cursor-text hover:opacity-80 transition-opacity"
+            style={{ 
+                fontFamily: config.headerFont, 
+                color: config.headerColor,
+                textShadow: `0 0 20px ${config.headerColor}66`
+            }}
+        />
       </header>
-
+      
       {/* Toggle Visibility Button - Left Side */}
       <div className="absolute left-4 top-1/2 transform -translate-y-1/2 pointer-events-auto z-50">
         <button 
@@ -63,7 +123,39 @@ export const Overlay: React.FC<OverlayProps> = ({ config, setConfig }) => {
             <div className="h-px bg-[#d4af37]/30 flex-grow ml-4"></div>
           </div>
           
-          <div className="grid grid-cols-2 gap-2">
+          {/* Main Button for Experience */}
+          <button 
+            onClick={handleStartClick}
+            disabled={isCountingDown}
+            className={`w-full py-3 px-3 rounded-lg text-sm font-bold uppercase tracking-widest transition-all duration-300 border ${
+                config.isExperienceActive 
+                ? 'bg-transparent border-[#ef4444] text-[#ef4444] hover:bg-[#ef4444]/20'
+                : 'bg-[#d4af37] border-[#d4af37] text-[#031f18] hover:bg-[#b8952b] shadow-[0_0_20px_rgba(212,175,55,0.4)]'
+            } ${isCountingDown ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            {config.isExperienceActive ? 'Close Experience' : (isCountingDown ? 'Starting...' : 'Start Experience')}
+          </button>
+          
+          {/* Countdown Selector */}
+          {!config.isExperienceActive && (
+              <div className="flex items-center justify-between text-xs text-gray-300">
+                  <span>Start Delay:</span>
+                  <div className="flex gap-1 bg-black/30 rounded p-1">
+                      {[0, 3, 5, 10].map(val => (
+                          <button
+                            key={val}
+                            onClick={() => setCountdownSetting(val)}
+                            className={`px-2 py-1 rounded transition-colors ${countdownSetting === val ? 'bg-[#d4af37] text-black font-bold' : 'hover:bg-white/10'}`}
+                          >
+                            {val}s
+                          </button>
+                      ))}
+                  </div>
+              </div>
+          )}
+
+          {/* Other Toggles - Only visible if active, or keep them visible? Keeping them visible allows pre-config */}
+          <div className="grid grid-cols-2 gap-2 mt-2">
             <button 
               onClick={toggleLights}
               className={`py-3 px-1 rounded-lg text-xs font-medium transition-all duration-300 border ${
@@ -108,17 +200,38 @@ export const Overlay: React.FC<OverlayProps> = ({ config, setConfig }) => {
               {config.rotationSpeed > 0 ? 'Spin' : 'Static'}
             </button>
           </div>
-          
-          {/* Animation Trigger */}
-          <button 
-            onClick={animateRibbon}
-            className="w-full py-2 px-3 rounded-lg text-xs font-bold uppercase tracking-widest transition-all duration-300 border bg-[#d4af37] text-[#031f18] hover:bg-[#b8952b] hover:shadow-[0_0_20px_rgba(212,175,55,0.4)]"
-          >
-            Stream Ribbon
-          </button>
 
+          {/* Header Customization */}
           <div className="flex justify-between items-center text-[#e2e8f0] mt-2">
-             <span className="font-serif text-sm text-[#d4af37]">Colors</span>
+             <span className="font-serif text-sm text-[#d4af37]">Title Style</span>
+             <div className="h-px bg-[#d4af37]/30 flex-grow ml-4"></div>
+          </div>
+          
+          <div className="flex flex-col gap-2">
+             <select 
+                value={config.headerFont} 
+                onChange={(e) => setConfig(prev => ({ ...prev, headerFont: e.target.value }))}
+                className="w-full bg-[#010b14] text-[#d4af37] text-xs p-2 rounded border border-gray-600 focus:border-[#d4af37] outline-none"
+             >
+                {fonts.map(font => (
+                    <option key={font.name} value={font.value}>{font.name}</option>
+                ))}
+             </select>
+             
+             <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-400 uppercase tracking-wider">Title Color</span>
+                <label className="flex items-center gap-2 cursor-pointer group">
+                    <div className="relative w-8 h-6 rounded overflow-hidden border border-gray-500 group-hover:border-[#d4af37]">
+                       <input type="color" value={config.headerColor} onChange={(e) => handleColorChange('headerColor', e)} className="absolute -top-2 -left-2 w-[150%] h-[150%] cursor-pointer" />
+                    </div>
+                </label>
+             </div>
+          </div>
+
+
+          {/* Colors */}
+          <div className="flex justify-between items-center text-[#e2e8f0] mt-2">
+             <span className="font-serif text-sm text-[#d4af37]">Theme Colors</span>
              <div className="h-px bg-[#d4af37]/30 flex-grow ml-4"></div>
           </div>
           

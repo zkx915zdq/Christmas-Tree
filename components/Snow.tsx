@@ -104,8 +104,8 @@ export const Snow: React.FC<SnowProps> = ({ count = 1000 }) => {
       );
       speeds.push(0.3 + Math.random() * 0.7);
       randoms.push(Math.random());
-      // Increase size slightly for the texture to be visible
-      sizes.push(4.0 + Math.random() * 8.0);
+      // Smaller particle size for a cleaner look
+      sizes.push(1.5 + Math.random() * 3.5);
     }
 
     geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));

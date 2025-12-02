@@ -6,10 +6,15 @@ import { useFrame } from '@react-three/fiber';
 interface TopStarProps {
   position: [number, number, number];
   color?: string;
+  visible?: boolean; // Corresponds to isExperienceActive
 }
 
-export const TopStar: React.FC<TopStarProps> = ({ position, color = '#ffaa00' }) => {
+export const TopStar: React.FC<TopStarProps> = ({ position, color = '#ffaa00', visible = true }) => {
   const groupRef = useRef<THREE.Group>(null);
+  const scaleRef = useRef(0);
+  
+  // Local growth state
+  const currentGrowth = useRef(0);
   
   // 1. Solid Geometry (Sharper Prismatic Star)
   const solidGeometry = useMemo(() => {
@@ -39,17 +44,13 @@ export const TopStar: React.FC<TopStarProps> = ({ position, color = '#ffaa00' })
     for (let i = 0; i < numPoints * 2; i++) {
         const currentRingIndex = 2 + i;
         const nextRingIndex = 2 + ((i + 1) % (numPoints * 2));
-
-        // Front Face (Connect Front Peak to Ring)
         indices.push(0, currentRingIndex, nextRingIndex);
-        // Back Face (Connect Back Peak to Ring)
         indices.push(1, nextRingIndex, currentRingIndex);
     }
 
     geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
     geo.setIndex(indices);
     geo.computeVertexNormals();
-    
     return geo;
   }, []);
 
@@ -58,12 +59,14 @@ export const TopStar: React.FC<TopStarProps> = ({ position, color = '#ffaa00' })
     uniforms: {
       uTime: { value: 0 },
       uColor: { value: new THREE.Color(color) },
+      uScale: { value: 0 }, // animate shader scale too
     },
     transparent: true,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
     vertexShader: `
       uniform float uTime;
+      uniform float uScale;
       attribute float aSize;
       attribute float aPhase;
       varying float vAlpha;
@@ -78,12 +81,12 @@ export const TopStar: React.FC<TopStarProps> = ({ position, color = '#ffaa00' })
         
         float pulse = sin(uTime * 4.0 + aPhase);
         float scale = 1.0 + 0.4 * pulse;
-        gl_PointSize = aSize * scale * (18.0 / -mvPosition.z);
+        // multiply by uScale for appear animation
+        gl_PointSize = aSize * scale * uScale * (18.0 / -mvPosition.z);
         
-        vAlpha = (0.5 + 0.5 * pulse); 
+        vAlpha = (0.5 + 0.5 * pulse) * step(0.01, uScale); 
         
         vec3 white = vec3(1.0, 1.0, 1.0);
-        // Mix user color with white for sparkle
         vColor = mix(uColor, white, smoothstep(0.5, 1.0, pulse));
       }
     `,
@@ -96,13 +99,12 @@ export const TopStar: React.FC<TopStarProps> = ({ position, color = '#ffaa00' })
         gl_FragColor = vec4(vColor, vAlpha);
       }
     `
-  }), []); // Removed color dependency
+  }), []); 
 
   useEffect(() => {
     sparkleMaterial.uniforms.uColor.value.set(color);
   }, [color, sparkleMaterial]);
 
-  // Geometry for ambient sparkles
   const sparkleGeometry = useMemo(() => {
     const geo = new THREE.BufferGeometry();
     const count = 40;
@@ -110,7 +112,6 @@ export const TopStar: React.FC<TopStarProps> = ({ position, color = '#ffaa00' })
     const sizes = [];
     const phases = [];
     for (let i = 0; i < count; i++) {
-        // Tighter radius for smaller star
         const r = 0.2 + Math.random() * 0.4;
         const theta = Math.random() * Math.PI * 2;
         const phi = Math.random() * Math.PI;
@@ -131,15 +132,30 @@ export const TopStar: React.FC<TopStarProps> = ({ position, color = '#ffaa00' })
   useFrame((state, delta) => {
     const time = state.clock.elapsedTime;
     
+    // Sync growth
+    const targetGrowth = visible ? 1.0 : 0.0;
+    currentGrowth.current = THREE.MathUtils.lerp(currentGrowth.current, targetGrowth, 0.01);
+    
+    // Animate Show/Hide
+    // Star appears when growth reaches near top (0.95)
+    let targetScale = 0.0;
+    if (currentGrowth.current > 0.95) {
+        targetScale = THREE.MathUtils.smoothstep(currentGrowth.current, 0.95, 1.0);
+    }
+    
+    scaleRef.current = targetScale; // Direct apply or smoothing? Using smoothstep above handles ramp.
+
     if (groupRef.current) {
         groupRef.current.rotation.y += delta * 0.5;
+        groupRef.current.scale.setScalar(scaleRef.current);
     }
 
     sparkleMaterial.uniforms.uTime.value = time;
+    sparkleMaterial.uniforms.uScale.value = scaleRef.current;
   });
 
   return (
-    <group ref={groupRef} position={position}>
+    <group ref={groupRef} position={position} scale={[0,0,0]}>
         {/* Solid Star */}
         <mesh geometry={solidGeometry}>
             <meshStandardMaterial 
@@ -155,9 +171,9 @@ export const TopStar: React.FC<TopStarProps> = ({ position, color = '#ffaa00' })
         {/* Ambient Sparkles */}
         <points geometry={sparkleGeometry} material={sparkleMaterial} />
         
-        {/* Light Source (Very bright to glow) */}
+        {/* Light Source */}
         <pointLight 
-            intensity={8} 
+            intensity={8 * scaleRef.current} 
             distance={8} 
             color={color} 
             decay={2} 

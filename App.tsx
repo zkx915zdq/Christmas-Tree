@@ -1,3 +1,4 @@
+
 import React, { useState, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Loader } from '@react-three/drei';
@@ -15,11 +16,16 @@ const App: React.FC = () => {
     bgmUrl: null,
     photoUrls: [],
     ribbonAnimationTrigger: 0,
+    isExperienceActive: false, // Default: Hidden
     treeColor: '#024025', // Deep Emerald
     ribbonColor: '#ffd700', // Dazzling Gold
     starColor: '#ffaa00', // Warm Gold
     starDensity: 3000,
     skyColor: '#000510', // Midnight Blue
+    // Header Defaults
+    headerText: "KaiXuan's Christmas Tree",
+    headerFont: '"Mountains of Christmas", serif',
+    headerColor: '#d4af37',
   });
 
   return (
@@ -35,12 +41,13 @@ const App: React.FC = () => {
         </Suspense>
       </Canvas>
       
-      <Music enabled={config.musicEnabled} src={config.bgmUrl} />
+      {/* Music plays only when experience is active AND music is enabled */}
+      <Music enabled={config.musicEnabled && config.isExperienceActive} src={config.bgmUrl} />
 
       <Loader 
         containerStyles={{ background: config.skyColor }}
-        barStyles={{ background: '#d4af37' }}
-        dataStyles={{ color: '#d4af37', fontFamily: 'Playfair Display' }}
+        barStyles={{ background: config.headerColor }}
+        dataStyles={{ color: config.headerColor, fontFamily: config.headerFont }}
       />
       
       <Overlay config={config} setConfig={setConfig} />
